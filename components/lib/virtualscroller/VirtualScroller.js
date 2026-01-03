@@ -43,6 +43,7 @@ export const VirtualScroller = React.memo(
         const stickyRef = React.useRef(null);
         const lastScrollPos = React.useRef(both ? { top: 0, left: 0 } : 0);
         const scrollTimeout = React.useRef(null);
+        const rafId = React.useRef(null);
         const resizeTimeout = React.useRef(null);
         const contentStyle = React.useRef({});
         const spacerStyle = React.useRef({});
@@ -318,7 +319,21 @@ export const VirtualScroller = React.memo(
             }
         };
 
-        const onScrollPositionChange = (event) => {
+        const getNormalizedScrollPos = (target) => {
+            if (!target) {
+                return { top: 0, left: 0 };
+            }
+
+            const maxTop = target.scrollHeight - target.clientHeight;
+            const maxLeft = target.scrollWidth - target.clientWidth;
+
+            return {
+                top: Math.max(0, Math.min(target.scrollTop, maxTop)),
+                left: Math.max(0, Math.min(target.scrollLeft, maxLeft))
+            };
+        };
+
+        const onScrollPositionChange = (event, normalizedScroll) => {
             const target = event.target;
             const contentPos = getContentPosition();
             const calculateScrollPos = (_pos, _cpos) => (_pos ? (_pos > _cpos ? _pos - _cpos : _pos) : 0);
@@ -346,8 +361,16 @@ export const VirtualScroller = React.memo(
                 return getLast(lastValue, _isCols);
             };
 
-            const scrollTop = calculateScrollPos(target.scrollTop, contentPos.top);
-            const scrollLeft = calculateScrollPos(target.scrollLeft, contentPos.left);
+            const scrollTop = calculateScrollPos(
+            normalizedScroll ? normalizedScroll.top : target.scrollTop,
+            contentPos.top
+        );
+
+        const scrollLeft = calculateScrollPos(
+            normalizedScroll ? normalizedScroll.left : target.scrollLeft,
+            contentPos.left
+        );
+
 
             let newFirst = both ? { rows: 0, cols: 0 } : 0;
             let newLast = lastState;
@@ -401,7 +424,10 @@ export const VirtualScroller = React.memo(
         };
 
         const onScrollChange = (event) => {
-            const { first, last, isRangeChanged, scrollPos } = onScrollPositionChange(event);
+        const normalizedScroll = event.normalizedScroll;
+
+        const { first, last, isRangeChanged, scrollPos } =
+            onScrollPositionChange(event, normalizedScroll);
 
             if (isRangeChanged) {
                 const newState = { first, last };
@@ -429,34 +455,51 @@ export const VirtualScroller = React.memo(
         };
 
         const onScroll = (event) => {
-            props.onScroll && props.onScroll(event);
+    props.onScroll && props.onScroll(event);
 
-            if (props.delay) {
-                if (scrollTimeout.current) {
-                    clearTimeout(scrollTimeout.current);
-                }
+    const target = event.target;
 
-                if (isPageChanged(firstState)) {
-                    if (!loadingState && props.showLoader) {
-                        const { isRangeChanged } = onScrollPositionChange(event);
-                        const changed = isRangeChanged || (props.step ? isPageChanged(firstState) : false);
+    if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+    }
 
-                        changed && setLoadingState(true);
-                    }
+    rafId.current = requestAnimationFrame(() => {
+        // Normalize Firefox scroll values
+        const { top, left } = getNormalizedScrollPos(target);
 
-                    scrollTimeout.current = setTimeout(() => {
-                        onScrollChange(event);
-
-                        if (loadingState && props.showLoader && (!props.lazy || props.loading === undefined)) {
-                            setLoadingState(false);
-                            setPageState(getPageByFirst(firstState));
-                        }
-                    }, props.delay);
-                }
-            } else {
-                onScrollChange(event);
+        if (props.delay) {
+            if (scrollTimeout.current) {
+                clearTimeout(scrollTimeout.current);
             }
-        };
+
+            if (isPageChanged(firstState)) {
+                if (!loadingState && props.showLoader) {
+                    const { isRangeChanged } = onScrollPositionChange(event, { top, left });
+                    const changed = isRangeChanged || (props.step ? isPageChanged(firstState) : false);
+
+                    changed && setLoadingState(true);
+                }
+
+                scrollTimeout.current = setTimeout(() => {
+                    onScrollChange({
+                        ...event,
+                        normalizedScroll: { top, left }
+                    });
+
+                    if (loadingState && props.showLoader && (!props.lazy || props.loading === undefined)) {
+                        setLoadingState(false);
+                        setPageState(getPageByFirst(firstState));
+                    }
+                }, props.delay);
+            }
+        } else {
+            onScrollChange({
+                ...event,
+                normalizedScroll: { top, left }
+            });
+        }
+    });
+    };
 
         const onResize = () => {
             if (resizeTimeout.current) {
@@ -564,6 +607,14 @@ export const VirtualScroller = React.memo(
                 viewInitialized.current = true;
             }
         });
+
+        React.useEffect(() => {
+            return () => {
+                if (rafId.current) {
+                    cancelAnimationFrame(rafId.current);
+                }
+            };
+        }, []);
 
         useUpdateEffect(() => {
             init();
