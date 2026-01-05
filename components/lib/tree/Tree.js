@@ -343,7 +343,7 @@ export const Tree = React.memo(
                         filteredNodes.current.push(copyNode);
                     }
                 }
-                
+
                 onToggle({
                     originalEvent: null,
                     value: currentFilterExpandedKeys.current,
