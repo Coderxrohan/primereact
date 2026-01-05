@@ -47,11 +47,14 @@ export function DocComponent(props) {
                             {header}
                         </button>
                     </li>
+                    {props.apiDocs ? (
                     <li className={classNames({ 'doc-tabmenu-active': tab === 1 })}>
                         <button type="button" onClick={() => activateTab(1)}>
                             API
                         </button>
                     </li>
+                    ) : null}
+
                     {props.themingDocs ? (
                         <li className={classNames({ 'doc-tabmenu-active': tab === 2 })}>
                             <button type="button" onClick={() => activateTab(2)}>
