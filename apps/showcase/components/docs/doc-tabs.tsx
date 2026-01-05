@@ -1,29 +1,37 @@
 'use client';
+
 import { cn } from '@primeuix/utils';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React from 'react';
 
 const tabs = [
-    { key: 'features', label: 'FEATURES', href: (componentName: string) => `/docs/components/${componentName}` },
-    { key: 'api', label: 'API', href: (componentName: string) => `/docs/components/${componentName}/api` },
-    { key: 'theming', label: 'THEMING', href: (componentName: string) => `/docs/components/${componentName}/theming` },
-    { key: 'pt', label: 'PASS THROUGH', href: (componentName: string) => `/docs/components/${componentName}/pt` }
+    { key: 'features', label: 'FEATURES', href: (c: string) => `/docs/components/${c}` },
+    { key: 'api', label: 'API', href: (c: string) => `/docs/components/${c}/api` },
+    { key: 'theming', label: 'THEMING', href: (c: string) => `/docs/components/${c}/theming` },
+    { key: 'pt', label: 'PASS THROUGH', href: (c: string) => `/docs/components/${c}/pt` }
 ];
 
-const DocTabs = ({ componentName }: React.ComponentProps<'ul'> & { componentName: string }) => {
+const DocTabs = ({ componentName }: { componentName: string }) => {
     const pathname = usePathname();
-    const tab = pathname.split('/')?.[4] ?? 'features';
+
+    const activeTab = pathname.split('/')?.[4] ?? 'features';
+
+    const hasApiPage =
+        pathname.endsWith('/api') ||
+        pathname.endsWith('/theming') ||
+        pathname.endsWith('/pt');
 
     return (
         <ul className="doc-tabmenu">
-            {tabs.map((doc, index) => (
-                <li key={index} className={cn({ 'doc-tabmenu-active': tab === doc.key })}>
-                    <Link href={doc.href(componentName)}>
-                        <button type="button">{doc.label}</button>
-                    </Link>
-                </li>
-            ))}
+            {tabs
+                .filter((tab) => tab.key !== 'api' || hasApiPage)
+                .map((tab, index) => (
+                    <li key={index} className={cn({ 'doc-tabmenu-active': activeTab === tab.key })}>
+                        <Link href={tab.href(componentName)}>
+                            <button type="button">{tab.label}</button>
+                        </Link>
+                    </li>
+                ))}
         </ul>
     );
 };
